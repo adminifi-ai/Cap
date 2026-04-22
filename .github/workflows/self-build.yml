@@ -1,0 +1,86 @@
+name: self-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version string for this build (affects installer filename only)"
+        required: false
+        default: "0.0.1"
+        type: string
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - target: aarch64-apple-darwin
+            runner: macos-14
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+    runs-on: ${{ matrix.settings.runner }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - uses: ./.github/actions/setup-rust-cache
+        with:
+          target: ${{ matrix.settings.target }}
+
+      - uses: ./.github/actions/setup-js
+
+      - name: Create .env file in root
+        shell: bash
+        run: |
+          echo "appVersion=${{ inputs.version }}" >> .env
+          echo "VITE_ENVIRONMENT=production" >> .env
+          echo "VITE_SERVER_URL=${{ secrets.SELF_HOST_URL }}" >> .env
+          echo "NEXT_PUBLIC_WEB_URL=${{ secrets.SELF_HOST_URL }}" >> .env
+          echo "NEXTAUTH_URL=${{ secrets.SELF_HOST_URL }}" >> .env
+          echo "RUST_TARGET_TRIPLE=${{ matrix.settings.target }}" >> .env
+
+      - name: Run cap-setup
+        shell: bash
+        run: pnpm -w cap-setup
+        env:
+          RUST_TARGET_TRIPLE: ${{ matrix.settings.target }}
+
+      - name: Build cap-muxer sidecar
+        shell: bash
+        run: ./scripts/build-cap-muxer.sh ${{ matrix.settings.target }}
+
+      - name: Build app
+        working-directory: apps/desktop
+        shell: bash
+        run: pnpm build:tauri --target ${{ matrix.settings.target }} --config src-tauri/tauri.prod.conf.json
+        env:
+          CI: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Upload macOS artifacts
+        if: ${{ runner.os == 'macOS' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cap-${{ matrix.settings.target }}
+          path: |
+            target/${{ matrix.settings.target }}/release/bundle/dmg/*.dmg
+            target/${{ matrix.settings.target }}/release/bundle/macos/*.app.tar.gz
+          if-no-files-found: error
+
+      - name: Upload Windows artifacts
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cap-${{ matrix.settings.target }}
+          path: target/${{ matrix.settings.target }}/release/bundle/nsis/*.exe
+          if-no-files-found: error
