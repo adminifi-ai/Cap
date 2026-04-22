@@ -9,8 +9,8 @@
     <a href="https://cap.so"><strong>Cap.so »</strong></a>
     <br />
     <br />
-    <b>Downloads for </b>
-		<a href="https://cap.so/download">macOS & Windows</a>
+    <b>Internal Downloads: </b>
+		<a href="https://github.com/adminifi-ai/Cap/actions/workflows/self-build.yml">macOS & Windows builds</a>
     <br />
   </p>
 </p>
@@ -22,7 +22,52 @@ Cap is the open source alternative to Loom. It's a video messaging tool that all
 
 <img src="https://raw.githubusercontent.com/CapSoftware/Cap/refs/heads/main/apps/web/public/landing-cover.png"/>
 
-# Self Hosting
+# Our Deployment
+
+This fork runs against an internal self-hosted Cap instance deployed on **[Railway](https://railway.com/)**. Desktop builds produced by the workflow below are pre-configured to talk to that instance.
+
+For access to the Railway project, environment variables, deployment issues, or anything else about our internal instance, ping **[@jacogrande](https://github.com/jacogrande)**.
+
+## Downloading the Desktop App
+
+We don't publish signed releases — instead, we build unsigned desktop installers on demand via GitHub Actions and download them as run artifacts.
+
+1. Go to **[Actions → self-build](https://github.com/adminifi-ai/Cap/actions/workflows/self-build.yml)** in this repo.
+2. Pick the most recent successful run (or trigger a new one — see below).
+3. Scroll to the **Artifacts** section at the bottom of the run page and download the build for your platform:
+   - `cap-aarch64-apple-darwin` — Apple Silicon Macs (M1/M2/M3/M4)
+   - `cap-x86_64-apple-darwin` — Intel Macs
+   - `cap-x86_64-pc-windows-msvc` — Windows (64-bit)
+4. Unzip and install: `.dmg` on macOS, `.exe` (NSIS installer) on Windows.
+
+### First-launch warnings (expected)
+
+Because these builds aren't code-signed or notarized:
+
+- **macOS**: right-click the app → Open the first time, or run `xattr -dr com.apple.quarantine /Applications/Cap.app` after installing.
+- **Windows**: SmartScreen will warn you — click "More info" → "Run anyway".
+
+## Building the Desktop App
+
+The `self-build` workflow (at [`.github/workflows/self-build.yml`](.github/workflows/self-build.yml)) builds the Tauri desktop app for macOS (arm64 + x86_64) and Windows (x86_64) in parallel. It's triggered manually:
+
+**GitHub UI** → Actions tab → **self-build** → Run workflow → (optionally set a version string) → Run.
+
+Build time is roughly 15–25 minutes on a cold Rust cache, faster afterwards thanks to `setup-rust-cache`.
+
+### Required repo secrets
+
+The workflow depends on three repository secrets (**Settings → Secrets and variables → Actions**):
+
+| Secret | Purpose |
+|---|---|
+| `SELF_HOST_URL` | Base URL of our Railway-hosted Cap instance (no trailing slash). Baked into builds as `VITE_SERVER_URL`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Tauri updater signing key. Required by the bundler even though we don't use auto-update. Generate once with `pnpm tauri signer generate` from `apps/desktop`. |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for the key above (can be empty). |
+
+If any of these need rotating or you're standing up a new fork, talk to @jacogrande.
+
+# Self Hosting (upstream)
 
 ### Quick Start (One Command)
 
