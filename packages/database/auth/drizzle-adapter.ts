@@ -1,3 +1,4 @@
+import { serverEnv } from "@cap/env";
 import { STRIPE_AVAILABLE, stripe } from "@cap/utils";
 import { type ImageUpload, Organisation, User } from "@cap/web-domain";
 import { and, eq } from "drizzle-orm";
@@ -20,6 +21,7 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 		async createUser(userData: any) {
 			const normalizedEmail = (userData.email as string)?.toLowerCase() ?? "";
 			const userId = User.UserId.make(nanoId());
+			const configuredDefaultOrgId = serverEnv().DEFAULT_ORG_ID?.trim();
 			await db.transaction(async (tx) => {
 				const [pendingInvite] = await tx
 					.select({ id: organizationInvites.id })
@@ -43,6 +45,42 @@ export function DrizzleAdapter(db: MySql2Database): Adapter {
 
 				if (pendingInvite) {
 					return;
+				}
+
+				if (configuredDefaultOrgId) {
+					const [defaultOrg] = await tx
+						.select({ id: organizations.id })
+						.from(organizations)
+						.where(
+							eq(
+								organizations.id,
+								Organisation.OrganisationId.make(configuredDefaultOrgId),
+							),
+						)
+						.limit(1);
+
+					if (defaultOrg) {
+						await tx.insert(organizationMembers).values({
+							id: nanoId(),
+							organizationId: defaultOrg.id,
+							userId,
+							role: "member",
+						});
+
+						await tx
+							.update(users)
+							.set({
+								activeOrganizationId: defaultOrg.id,
+								defaultOrgId: defaultOrg.id,
+							})
+							.where(eq(users.id, userId));
+
+						return;
+					}
+
+					console.warn(
+						`DEFAULT_ORG_ID=${configuredDefaultOrgId} is set but no matching organization exists; falling back to creating a personal org for ${normalizedEmail}`,
+					);
 				}
 
 				const organizationId = Organisation.OrganisationId.make(nanoId());

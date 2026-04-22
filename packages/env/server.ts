@@ -80,6 +80,18 @@ function createServerEnv() {
 				.string()
 				.optional()
 				.describe("Comma-separated list of permitted signup domains"),
+			CAP_ALLOWED_SIGNUP_EMAILS: z
+				.string()
+				.optional()
+				.describe(
+					"Comma-separated list of specific email addresses allowed to sign up. Matched in addition to CAP_ALLOWED_SIGNUP_DOMAINS.",
+				),
+			DEFAULT_ORG_ID: z
+				.string()
+				.optional()
+				.describe(
+					"If set, new users are auto-enrolled as members of this organization instead of getting a personal one. Pending invites take precedence.",
+				),
 
 			/// AI providers
 			DEEPGRAM_API_KEY: z.string().optional().describe("Audio transcription"),

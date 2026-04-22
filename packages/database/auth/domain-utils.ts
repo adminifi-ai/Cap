@@ -3,19 +3,41 @@ import { z } from "zod";
 export function isEmailAllowedForSignup(
 	email: string,
 	allowedDomainsConfig?: string,
+	allowedEmailsConfig?: string,
 ): boolean {
-	// If no domain restrictions are configured, allow all signups
-	if (!allowedDomainsConfig || allowedDomainsConfig.trim() === "") {
+	const hasDomainConfig = !!allowedDomainsConfig?.trim();
+	const hasEmailConfig = !!allowedEmailsConfig?.trim();
+
+	if (!hasDomainConfig && !hasEmailConfig) {
 		return true;
 	}
 
-	const emailDomain = extractDomainFromEmail(email);
-	if (!emailDomain) {
-		return false;
+	const normalizedEmail = email.toLowerCase();
+
+	if (hasEmailConfig) {
+		const allowedEmails = parseAllowedEmails(allowedEmailsConfig!);
+		if (allowedEmails.includes(normalizedEmail)) {
+			return true;
+		}
 	}
 
-	const allowedDomains = parseAllowedDomains(allowedDomainsConfig);
-	return allowedDomains.includes(emailDomain.toLowerCase());
+	if (hasDomainConfig) {
+		const emailDomain = extractDomainFromEmail(email);
+		if (!emailDomain) return false;
+		const allowedDomains = parseAllowedDomains(allowedDomainsConfig!);
+		if (allowedDomains.includes(emailDomain.toLowerCase())) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function parseAllowedEmails(allowedEmailsConfig: string): string[] {
+	return allowedEmailsConfig
+		.split(",")
+		.map((entry) => entry.trim().toLowerCase())
+		.filter((entry) => entry.length > 0 && entry.includes("@"));
 }
 
 function extractDomainFromEmail(email: string): string | null {
