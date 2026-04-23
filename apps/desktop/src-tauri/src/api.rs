@@ -299,6 +299,8 @@ pub struct Organization {
     pub id: String,
     pub name: String,
     pub owner_id: String,
+    #[serde(default)]
+    pub is_default: bool,
 }
 
 pub async fn signal_recording_complete(

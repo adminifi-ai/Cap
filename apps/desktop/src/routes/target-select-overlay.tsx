@@ -142,7 +142,8 @@ function useOptions() {
 				organizations().every((o) => o.id !== _rawOptions.organizationId) &&
 				organizations().length > 0)
 		)
-			ret.organizationId = organizations()[0]?.id;
+			ret.organizationId =
+				organizations().find((o) => o.isDefault)?.id ?? organizations()[0]?.id;
 
 		return ret;
 	});

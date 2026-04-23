@@ -255,7 +255,10 @@ export function ExportPage() {
 		Object.defineProperty(ret, "organizationId", {
 			get() {
 				if (!_settings.organizationId && organisations().length > 0)
-					return organisations()[0].id;
+					return (
+						organisations().find((o) => o.isDefault)?.id ??
+						organisations()[0].id
+					);
 
 				return _settings.organizationId;
 			},

@@ -374,7 +374,12 @@ app.get("/organizations", withAuth, async (c) => {
 			),
 		);
 
-	return c.json(orgs);
+	return c.json(
+		orgs.map((org) => ({
+			...org,
+			isDefault: org.id === user.defaultOrgId,
+		})),
+	);
 });
 
 app.post(
