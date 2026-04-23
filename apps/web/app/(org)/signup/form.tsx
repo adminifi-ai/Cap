@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { isEmailAuthorizedForAuth } from "@/actions/auth/validate-email";
 import { getOrganizationSSOData } from "@/actions/organization/get-organization-sso-data";
 import { trackEvent } from "@/app/utils/analytics";
 import { usePublicEnv } from "@/utils/public-env";
@@ -275,6 +276,19 @@ export function SignupForm() {
 												auth_surface: "signup",
 											});
 											const normalizedEmail = email.trim().toLowerCase();
+
+											const authCheck =
+												await isEmailAuthorizedForAuth(normalizedEmail);
+											if (!authCheck.allowed) {
+												setLoading(false);
+												toast.error(
+													authCheck.reason === "invalid"
+														? "Please enter a valid email address"
+														: "This email address isn't authorized to sign up. Contact your admin.",
+												);
+												return;
+											}
+
 											signIn("email", {
 												email: normalizedEmail,
 												redirect: false,
