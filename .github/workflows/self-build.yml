@@ -84,3 +84,44 @@ jobs:
           name: cap-${{ matrix.settings.target }}
           path: target/${{ matrix.settings.target }}/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  release:
+    name: Publish rolling release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Delete existing rolling release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete internal-latest --yes --cleanup-tag --repo ${{ github.repository }}
+
+      - name: Publish rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: internal-latest
+          name: Internal build ${{ inputs.version }}
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+          body: |
+            Unsigned internal build for Adminifi coworkers.
+
+            **Downloads**
+            - macOS (Apple Silicon): `*_aarch64.dmg`
+            - macOS (Intel): `*_x64.dmg`
+            - Windows: `*_x64-setup.exe`
+
+            **macOS first-run:** right-click the app in Applications → Open to bypass Gatekeeper, or run `xattr -cr /Applications/Cap.app` in Terminal once.
+
+            Built from [`${{ github.sha }}`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) (workflow run [`${{ github.run_id }}`](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
