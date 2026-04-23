@@ -58,6 +58,7 @@
 	"exports": {
 		".": "./index.ts",
 		"./auth/auth-options": "./auth/auth-options.ts",
+		"./auth/domain-utils": "./auth/domain-utils.ts",
 		"./auth/session": "./auth/session.ts",
 		"./schema": "./schema.ts",
 		"./crypto": "./crypto.ts",
