@@ -17,8 +17,6 @@ jobs:
         settings:
           - target: aarch64-apple-darwin
             runner: macos-14
-          - target: x86_64-apple-darwin
-            runner: macos-13
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
     runs-on: ${{ matrix.settings.runner }}
@@ -117,7 +115,6 @@ jobs:
 
             **Downloads**
             - macOS (Apple Silicon): `*_aarch64.dmg`
-            - macOS (Intel): `*_x64.dmg`
             - Windows: `*_x64-setup.exe`
 
             **macOS first-run:** right-click the app in Applications → Open to bypass Gatekeeper, or run `xattr -cr /Applications/Cap.app` in Terminal once.
