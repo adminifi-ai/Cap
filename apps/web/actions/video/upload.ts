@@ -166,6 +166,7 @@ export async function createVideoAndGetUploadUrl({
 				.where(eq(videos.id, videoId));
 
 			if (existingVideo) {
+				if (existingVideo.ownerId !== user.id) throw new Error("Forbidden");
 				const fileKey = `${user.id}/${videoId}/${
 					isScreenshot ? "screenshot/screen-capture.jpg" : "result.mp4"
 				}`;

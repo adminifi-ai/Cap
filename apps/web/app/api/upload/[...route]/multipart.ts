@@ -482,6 +482,7 @@ app.post(
 
 					const mediaServerUrl = serverEnv().MEDIA_SERVER_URL;
 					if (video.source.type === "webMP4" && mediaServerUrl) {
+						const webhookSecret = serverEnv().MEDIA_SERVER_WEBHOOK_SECRET;
 						const inputUrl = yield* bucket.getInternalSignedObjectUrl(fileKey);
 						const outputPresignedUrl = yield* bucket.getInternalPresignedPutUrl(
 							fileKey,
@@ -501,7 +502,12 @@ app.post(
 									`${mediaServerUrl}/video/process`,
 									{
 										method: "POST",
-										headers: { "Content-Type": "application/json" },
+										headers: {
+											"Content-Type": "application/json",
+											...(webhookSecret
+												? { "x-media-server-secret": webhookSecret }
+												: {}),
+										},
 										body: JSON.stringify({
 											videoId,
 											userId: user.id,
