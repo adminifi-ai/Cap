@@ -19,6 +19,9 @@ use super::frame_converter::{copy_bgra_to_rgba, copy_rgba_plane};
 use super::multi_position::{DecoderPoolManager, MultiPositionDecoderConfig, ScrubDetector};
 use super::{DecoderInitResult, DecoderType, FRAME_CACHE_SIZE, VideoDecoderMessage, pts_to_frame};
 
+const MAX_RELAXED_FALLBACK_DISTANCE: u32 = 8;
+const SCRUB_REUSE_THRESHOLD_SECS: f32 = 0.5;
+
 #[derive(Clone)]
 struct FrameData {
     data: Arc<Vec<u8>>,
@@ -496,11 +499,19 @@ impl AVAssetReaderDecoder {
         })
     }
 
-    fn select_best_decoder(&mut self, requested_time: f32) -> (usize, bool) {
+    fn select_best_decoder(&mut self, requested_time: f32, is_scrubbing: bool) -> (usize, bool) {
         let decoder_count = self.decoders.len();
-        let (best_id, _distance, needs_reset) = self
-            .pool_manager
-            .find_best_decoder_for_time(requested_time, decoder_count);
+        let (best_id, _distance, needs_reset) = if is_scrubbing {
+            self.pool_manager
+                .find_best_decoder_for_time_with_reuse_threshold(
+                    requested_time,
+                    decoder_count,
+                    SCRUB_REUSE_THRESHOLD_SECS,
+                )
+        } else {
+            self.pool_manager
+                .find_best_decoder_for_time(requested_time, decoder_count)
+        };
 
         let decoder_idx = best_id.min(decoder_count.saturating_sub(1));
 
@@ -624,7 +635,7 @@ impl AVAssetReaderDecoder {
             let requested_frame = min_requested_frame;
             let requested_time = requested_frame as f32 / fps as f32;
 
-            let (decoder_idx, was_reset) = this.select_best_decoder(requested_time);
+            let (decoder_idx, was_reset) = this.select_best_decoder(requested_time, is_scrubbing);
 
             let cache_min = if was_reset {
                 min_requested_frame.saturating_sub(FRAME_CACHE_SIZE as u32 * 2)
