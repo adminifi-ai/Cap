@@ -113,8 +113,6 @@ const MEDIA_SERVER_START_MAX_ATTEMPTS = 6;
 const MEDIA_SERVER_START_RETRY_BASE_MS = 2000;
 const MEDIA_SERVER_COMPLETION_MAX_ATTEMPTS = 720;
 const MEDIA_SERVER_COMPLETION_POLL_INTERVAL_MS = 5000;
-const MEDIA_SERVER_PRESIGNED_GET_EXPIRES_SECONDS = 3 * 60 * 60;
-const MEDIA_SERVER_PRESIGNED_PUT_EXPIRES_SECONDS = 3 * 60 * 60;
 
 function isPositiveNumber(value: number | null): value is number {
 	return typeof value === "number" && Number.isFinite(value) && value > 0;
@@ -236,32 +234,22 @@ async function processVideoOnMediaServer(
 	).pipe(runPromise);
 
 	const rawVideoUrl = await bucket
-		.getInternalSignedObjectUrl(rawFileKey, {
-			expiresIn: MEDIA_SERVER_PRESIGNED_GET_EXPIRES_SECONDS,
-		})
+		.getInternalSignedObjectUrl(rawFileKey)
 		.pipe(runPromise);
 
 	const outputKey = `${userId}/${videoId}/result.mp4`;
 	const thumbnailKey = `${userId}/${videoId}/screenshot/screen-capture.jpg`;
 
 	const outputPresignedUrl = await bucket
-		.getInternalPresignedPutUrl(
-			outputKey,
-			{
-				ContentType: "video/mp4",
-			},
-			{ expiresIn: MEDIA_SERVER_PRESIGNED_PUT_EXPIRES_SECONDS },
-		)
+		.getInternalPresignedPutUrl(outputKey, {
+			ContentType: "video/mp4",
+		})
 		.pipe(runPromise);
 
 	const thumbnailPresignedUrl = await bucket
-		.getInternalPresignedPutUrl(
-			thumbnailKey,
-			{
-				ContentType: "image/jpeg",
-			},
-			{ expiresIn: MEDIA_SERVER_PRESIGNED_PUT_EXPIRES_SECONDS },
-		)
+		.getInternalPresignedPutUrl(thumbnailKey, {
+			ContentType: "image/jpeg",
+		})
 		.pipe(runPromise);
 
 	const webhookUrl = `${webhookBaseUrl}/api/webhooks/media-server/progress`;
