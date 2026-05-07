@@ -578,6 +578,8 @@ pub async fn spawn_instant_recording_actor(
                     .ok_or_else(|| anyhow::anyhow!("Missing shareable content"))?,
                 #[cfg(target_os = "macos")]
                 inputs.excluded_windows,
+                #[cfg(target_os = "macos")]
+                inputs.capture_target.window(),
             )
             .await
             .context("screen capture init")?;
