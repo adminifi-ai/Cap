@@ -304,16 +304,16 @@ impl ScreenCaptureConfig<CMSampleBufferCapture> {
         settings.set_pixel_format(cv::PixelFormat::_420V);
         settings.set_color_space_name(cg::color_space::names::srgb());
 
-        if target_sc_window.is_none() {
-            if let Some(crop_bounds) = self.config.crop_bounds {
-                debug!("crop bounds: {:?}", crop_bounds);
-                settings.set_src_rect(cg::Rect::new(
-                    crop_bounds.position().x(),
-                    crop_bounds.position().y(),
-                    crop_bounds.size().width(),
-                    crop_bounds.size().height(),
-                ));
-            }
+        if target_sc_window.is_none()
+            && let Some(crop_bounds) = self.config.crop_bounds
+        {
+            debug!("crop bounds: {:?}", crop_bounds);
+            settings.set_src_rect(cg::Rect::new(
+                crop_bounds.position().x(),
+                crop_bounds.position().y(),
+                crop_bounds.size().width(),
+                crop_bounds.size().height(),
+            ));
         }
         cap_fail::fail_err!(
             "macos::ScreenCaptureActor::new",
@@ -1077,15 +1077,15 @@ async fn rebuild_capturer(params: &CapturerRebuildParams) -> anyhow::Result<Capt
     settings.set_pixel_format(cv::PixelFormat::_420V);
     settings.set_color_space_name(cg::color_space::names::srgb());
 
-    if target_sc_window.is_none() {
-        if let Some(crop_bounds) = params.config.crop_bounds {
-            settings.set_src_rect(cg::Rect::new(
-                crop_bounds.position().x(),
-                crop_bounds.position().y(),
-                crop_bounds.size().width(),
-                crop_bounds.size().height(),
-            ));
-        }
+    if target_sc_window.is_none()
+        && let Some(crop_bounds) = params.config.crop_bounds
+    {
+        settings.set_src_rect(cg::Rect::new(
+            crop_bounds.position().x(),
+            crop_bounds.position().y(),
+            crop_bounds.size().width(),
+            crop_bounds.size().height(),
+        ));
     }
 
     let expected_width = params.video_info.width as usize;
