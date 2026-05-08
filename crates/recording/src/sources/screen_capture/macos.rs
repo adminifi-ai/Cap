@@ -201,51 +201,81 @@ impl ScreenCaptureConfig<CMSampleBufferCapture> {
         let display = Display::from_id(&self.config.display)
             .ok_or_else(|| SourceError::NoDisplay(self.config.display.clone()))?;
 
-        let excluded_sc_windows = if self.excluded_windows.is_empty() {
-            Vec::new()
-        } else {
-            let mut collected = Vec::new();
-
-            for window_id in &self.excluded_windows {
-                let Some(window) = Window::from_id(window_id) else {
-                    continue;
-                };
-
-                if let Some(sc_window) = window.raw_handle().as_sc(self.shareable_content.clone()) {
-                    collected.push(sc_window);
-                }
+        let target_sc_window = match self.config.target_window_id.as_ref() {
+            Some(window_id) => {
+                let window = Window::from_id(window_id)
+                    .ok_or_else(|| anyhow!("Target window not found: {:?}", window_id))?;
+                Some(
+                    window
+                        .raw_handle()
+                        .as_sc(self.shareable_content.clone())
+                        .ok_or_else(|| {
+                            anyhow!("Failed to resolve SCWindow for target: {:?}", window_id)
+                        })?,
+                )
             }
-
-            collected
+            None => None,
         };
 
-        let content_filter = display
-            .raw_handle()
-            .as_content_filter_excluding_windows(
-                self.shareable_content.clone(),
-                excluded_sc_windows,
-            )
-            .ok_or(SourceError::AsContentFilter)?;
+        let content_filter = if let Some(sc_window) = target_sc_window.as_ref() {
+            sc::ContentFilter::with_desktop_independent_window(sc_window.as_ref())
+        } else {
+            let excluded_sc_windows = if self.excluded_windows.is_empty() {
+                Vec::new()
+            } else {
+                let mut collected = Vec::new();
+
+                for window_id in &self.excluded_windows {
+                    let Some(window) = Window::from_id(window_id) else {
+                        continue;
+                    };
+
+                    if let Some(sc_window) =
+                        window.raw_handle().as_sc(self.shareable_content.clone())
+                    {
+                        collected.push(sc_window);
+                    }
+                }
+
+                collected
+            };
+
+            display
+                .raw_handle()
+                .as_content_filter_excluding_windows(
+                    self.shareable_content.clone(),
+                    excluded_sc_windows,
+                )
+                .ok_or(SourceError::AsContentFilter)?
+        };
 
         debug!("SCK content filter: {:?}", content_filter);
 
-        let size = {
-            let logical_size = self
-                .config
+        let physical_size = display
+            .physical_size()
+            .ok_or_else(|| anyhow!("Display has no physical size"))?;
+        let display_logical_size = display
+            .logical_size()
+            .ok_or_else(|| anyhow!("Display has no logical size for scale computation"))?;
+        let scale = physical_size.width() / display_logical_size.width();
+
+        let logical_size = if target_sc_window.is_some() {
+            self.config
+                .target_window_id
+                .as_ref()
+                .and_then(Window::from_id)
+                .and_then(|w| w.raw_handle().logical_size())
+                .or_else(|| self.config.crop_bounds.map(|b| b.size()))
+                .ok_or_else(|| anyhow!("Window has no logical size"))?
+        } else {
+            self.config
                 .crop_bounds
                 .map(|bounds| bounds.size())
                 .or_else(|| display.logical_size())
-                .ok_or_else(|| anyhow!("Display has no logical size"))?;
+                .ok_or_else(|| anyhow!("Display has no logical size"))?
+        };
 
-            let physical_size = display
-                .physical_size()
-                .ok_or_else(|| anyhow!("Display has no physical size"))?;
-            let display_logical_size = display
-                .logical_size()
-                .ok_or_else(|| anyhow!("Display has no logical size for scale computation"))?;
-
-            let scale = physical_size.width() / display_logical_size.width();
-
+        let size = {
             let width = ensure_even((logical_size.width() * scale) as u32) as f64;
             let height = ensure_even((logical_size.height() * scale) as u32) as f64;
             PhysicalSize::new(width, height)
@@ -274,7 +304,9 @@ impl ScreenCaptureConfig<CMSampleBufferCapture> {
         settings.set_pixel_format(cv::PixelFormat::_420V);
         settings.set_color_space_name(cg::color_space::names::srgb());
 
-        if let Some(crop_bounds) = self.config.crop_bounds {
+        if target_sc_window.is_none()
+            && let Some(crop_bounds) = self.config.crop_bounds
+        {
             debug!("crop bounds: {:?}", crop_bounds);
             settings.set_src_rect(cg::Rect::new(
                 crop_bounds.position().x(),
@@ -953,42 +985,77 @@ async fn rebuild_capturer(params: &CapturerRebuildParams) -> anyhow::Result<Capt
     let display = Display::from_id(&params.display_id)
         .ok_or_else(|| anyhow!("Display not found during restart: {:?}", params.display_id))?;
 
-    let excluded_sc_windows = if params.excluded_windows.is_empty() {
-        Vec::new()
-    } else {
-        let mut collected = Vec::new();
-        for window_id in &params.excluded_windows {
-            let Some(window) = Window::from_id(window_id) else {
-                continue;
-            };
-            if let Some(sc_window) = window.raw_handle().as_sc(shareable_content.clone()) {
-                collected.push(sc_window);
-            }
+    let target_sc_window = match params.config.target_window_id.as_ref() {
+        Some(window_id) => {
+            let window = Window::from_id(window_id).ok_or_else(|| {
+                anyhow!("Target window not found during restart: {:?}", window_id)
+            })?;
+            Some(
+                window
+                    .raw_handle()
+                    .as_sc(shareable_content.clone())
+                    .ok_or_else(|| {
+                        anyhow!(
+                            "Failed to resolve SCWindow for target during restart: {:?}",
+                            window_id
+                        )
+                    })?,
+            )
         }
-        collected
+        None => None,
     };
 
-    let content_filter = display
-        .raw_handle()
-        .as_content_filter_excluding_windows(shareable_content, excluded_sc_windows)
-        .ok_or_else(|| anyhow!("Failed to create content filter during restart"))?;
+    let content_filter = if let Some(sc_window) = target_sc_window.as_ref() {
+        sc::ContentFilter::with_desktop_independent_window(sc_window.as_ref())
+    } else {
+        let excluded_sc_windows = if params.excluded_windows.is_empty() {
+            Vec::new()
+        } else {
+            let mut collected = Vec::new();
+            for window_id in &params.excluded_windows {
+                let Some(window) = Window::from_id(window_id) else {
+                    continue;
+                };
+                if let Some(sc_window) = window.raw_handle().as_sc(shareable_content.clone()) {
+                    collected.push(sc_window);
+                }
+            }
+            collected
+        };
 
-    let size = {
-        let logical_size = params
+        display
+            .raw_handle()
+            .as_content_filter_excluding_windows(shareable_content, excluded_sc_windows)
+            .ok_or_else(|| anyhow!("Failed to create content filter during restart"))?
+    };
+
+    let physical_size = display
+        .physical_size()
+        .ok_or_else(|| anyhow!("Display has no physical size during restart"))?;
+    let display_logical_size = display.logical_size().ok_or_else(|| {
+        anyhow!("Display has no logical size for scale computation during restart")
+    })?;
+    let scale = physical_size.width() / display_logical_size.width();
+
+    let logical_size = if target_sc_window.is_some() {
+        params
+            .config
+            .target_window_id
+            .as_ref()
+            .and_then(Window::from_id)
+            .and_then(|w| w.raw_handle().logical_size())
+            .or_else(|| params.config.crop_bounds.map(|b| b.size()))
+            .ok_or_else(|| anyhow!("Window has no logical size during restart"))?
+    } else {
+        params
             .config
             .crop_bounds
             .map(|bounds| bounds.size())
             .or_else(|| display.logical_size())
-            .ok_or_else(|| anyhow!("Display has no logical size during restart"))?;
+            .ok_or_else(|| anyhow!("Display has no logical size during restart"))?
+    };
 
-        let physical_size = display
-            .physical_size()
-            .ok_or_else(|| anyhow!("Display has no physical size during restart"))?;
-        let display_logical_size = display.logical_size().ok_or_else(|| {
-            anyhow!("Display has no logical size for scale computation during restart")
-        })?;
-
-        let scale = physical_size.width() / display_logical_size.width();
+    let size = {
         let width = ensure_even((logical_size.width() * scale) as u32) as f64;
         let height = ensure_even((logical_size.height() * scale) as u32) as f64;
         PhysicalSize::new(width, height)
@@ -1010,7 +1077,9 @@ async fn rebuild_capturer(params: &CapturerRebuildParams) -> anyhow::Result<Capt
     settings.set_pixel_format(cv::PixelFormat::_420V);
     settings.set_color_space_name(cg::color_space::names::srgb());
 
-    if let Some(crop_bounds) = params.config.crop_bounds {
+    if target_sc_window.is_none()
+        && let Some(crop_bounds) = params.config.crop_bounds
+    {
         settings.set_src_rect(cg::Rect::new(
             crop_bounds.position().x(),
             crop_bounds.position().y(),

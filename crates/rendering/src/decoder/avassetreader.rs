@@ -19,6 +19,7 @@ use super::frame_converter::{copy_bgra_to_rgba, copy_rgba_plane};
 use super::multi_position::{DecoderPoolManager, MultiPositionDecoderConfig, ScrubDetector};
 use super::{DecoderInitResult, DecoderType, FRAME_CACHE_SIZE, VideoDecoderMessage, pts_to_frame};
 
+#[allow(dead_code)]
 const MAX_RELAXED_FALLBACK_DISTANCE: u32 = 8;
 const SCRUB_REUSE_THRESHOLD_SECS: f32 = 0.5;
 
