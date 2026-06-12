@@ -132,6 +132,19 @@ function createServerEnv() {
 			POSTHOG_PERSONAL_API_KEY: z.string().optional(),
 			DUB_API_KEY: z.string().optional(),
 
+			WORK_APP_URL: z
+				.string()
+				.optional()
+				.describe(
+					"Base URL of the Apollo work-app eg. https://apollo.example.com",
+				),
+			WORK_APP_API_KEY: z
+				.string()
+				.optional()
+				.describe(
+					"Apollo API key, sent as 'Bearer apollo:<key>' when calling the work-app",
+				),
+
 			/// Media Server
 			MEDIA_SERVER_URL: z
 				.string()
