@@ -23,6 +23,7 @@ import { Tooltip } from "@/components/Tooltip";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { usePublicEnv } from "@/utils/public-env";
 import type { VideoData } from "../types";
+import { PrdLinks } from "./PrdLinks";
 
 export const ShareHeader = ({
 	data,
@@ -31,10 +32,12 @@ export const ShareHeader = ({
 	sharedOrganizations = [],
 	sharedSpaces = [],
 	spacesData = null,
+	prdLinkingEnabled = false,
 }: {
 	data: VideoData;
 	customDomain?: string | null;
 	domainVerified?: boolean;
+	prdLinkingEnabled?: boolean;
 	sharedOrganizations?: { id: string; name: string }[];
 	userOrganizations?: { id: string; name: string }[];
 	sharedSpaces?: {
@@ -306,6 +309,13 @@ export const ShareHeader = ({
 								</div>
 								{user && renderSharedStatus()}
 							</div>
+							{(prdLinkingEnabled || !!data.metadata?.linkedPrds?.length) && (
+								<PrdLinks
+									videoId={data.id}
+									linkedPrds={data.metadata?.linkedPrds ?? []}
+									isOwner={!!isOwner && prdLinkingEnabled}
+								/>
+							)}
 						</div>
 					</div>
 					{user !== null && (
