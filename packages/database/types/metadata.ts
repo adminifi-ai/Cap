@@ -34,6 +34,15 @@ export interface VideoMetadata {
 		| "ERROR"
 		| "SKIPPED";
 	enhancedAudioStatus?: "PROCESSING" | "COMPLETE" | "ERROR" | "SKIPPED";
+	linkedPrds?: LinkedPrd[];
+}
+
+export interface LinkedPrd {
+	prdId: string;
+	prdVideoId: string;
+	slug: string;
+	name: string;
+	url: string;
 }
 
 /**
