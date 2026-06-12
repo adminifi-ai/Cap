@@ -12,7 +12,7 @@ import {
 	videoUploads,
 } from "@cap/database/schema";
 import type { VideoMetadata } from "@cap/database/types";
-import { buildEnv } from "@cap/env";
+import { buildEnv, serverEnv } from "@cap/env";
 import { Logo } from "@cap/ui";
 import { userIsPro } from "@cap/utils";
 import {
@@ -670,6 +670,9 @@ async function AuthorizedContent({
 					sharedSpaces={sharedSpaces}
 					userOrganizations={userOrganizations}
 					spacesData={spacesData}
+					prdLinkingEnabled={
+						!!(serverEnv().WORK_APP_URL && serverEnv().WORK_APP_API_KEY)
+					}
 				/>
 
 				<Share
