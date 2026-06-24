@@ -483,9 +483,6 @@ app.post(
 					const mediaServerUrl = serverEnv().MEDIA_SERVER_URL;
 					if (video.source.type === "webMP4" && mediaServerUrl) {
 						const webhookSecret = serverEnv().MEDIA_SERVER_WEBHOOK_SECRET;
-						const webhookBaseUrl =
-							serverEnv().MEDIA_SERVER_WEBHOOK_URL || serverEnv().WEB_URL;
-						const webhookUrl = `${webhookBaseUrl}/api/webhooks/media-server/progress`;
 						const inputUrl = yield* bucket.getInternalSignedObjectUrl(fileKey);
 						const outputPresignedUrl = yield* bucket.getInternalPresignedPutUrl(
 							fileKey,
@@ -516,8 +513,6 @@ app.post(
 											userId: user.id,
 											videoUrl: inputUrl,
 											outputPresignedUrl,
-											webhookUrl,
-											webhookSecret: webhookSecret || undefined,
 											remuxOnly: true,
 										}),
 									},
@@ -533,28 +528,13 @@ app.post(
 							catch: (cause) =>
 								cause instanceof Error ? cause : new Error(String(cause)),
 						}).pipe(
-							Effect.catchAll((error) =>
-								Effect.gen(function* () {
-									console.error("Failed to queue faststart remux:", error);
-									yield* db
-										.use((tx) =>
-											tx
-												.update(Db.videoUploads)
-												.set({
-													phase: "error",
-													processingError: `Remux failed: ${
-														error instanceof Error
-															? error.message
-															: String(error)
-													}`.slice(0, 255),
-													updatedAt: new Date(),
-												})
-												.where(eq(Db.videoUploads.videoId, videoId)),
-										)
-										.pipe(Effect.catchAll(() => Effect.succeed(null)));
-									return null;
-								}),
-							),
+							Effect.catchAll((error) => {
+								console.error(
+									"Faststart remux enqueue failed (video remains playable):",
+									error,
+								);
+								return Effect.succeed(null);
+							}),
 						);
 					}
 

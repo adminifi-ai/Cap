@@ -8,6 +8,7 @@ import { and, eq, notInArray } from "drizzle-orm";
 import { Effect, Option, Schema } from "effect";
 import { Hono } from "hono";
 import { z } from "zod";
+import { getMediaServerWebhookUrl } from "@/lib/media-client";
 import { runPromise } from "@/lib/server";
 import { withAuth } from "../../utils";
 
@@ -205,9 +206,7 @@ export const app = new Hono().post(
 				}
 			}
 
-			const webhookBaseUrl =
-				serverEnv().MEDIA_SERVER_WEBHOOK_URL || serverEnv().WEB_URL;
-			const webhookUrl = `${webhookBaseUrl}/api/webhooks/media-server/progress`;
+			const webhookUrl = getMediaServerWebhookUrl();
 			const webhookSecret = serverEnv().MEDIA_SERVER_WEBHOOK_SECRET;
 
 			const muxBody: Record<string, unknown> = {

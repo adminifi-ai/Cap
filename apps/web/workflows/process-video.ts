@@ -6,6 +6,7 @@ import type { S3Bucket, Video } from "@cap/web-domain";
 import { eq } from "drizzle-orm";
 import { Option } from "effect";
 import { FatalError } from "workflow";
+import { getMediaServerWebhookUrl } from "@/lib/media-client";
 import { runPromise } from "@/lib/server";
 
 interface ProcessVideoWorkflowPayload {
@@ -223,8 +224,6 @@ async function processVideoOnMediaServer(
 	"use step";
 
 	const mediaServerUrl = serverEnv().MEDIA_SERVER_URL;
-	const webhookBaseUrl =
-		serverEnv().MEDIA_SERVER_WEBHOOK_URL || serverEnv().WEB_URL;
 	if (!mediaServerUrl) {
 		throw new FatalError("MEDIA_SERVER_URL is not configured");
 	}
@@ -252,7 +251,7 @@ async function processVideoOnMediaServer(
 		})
 		.pipe(runPromise);
 
-	const webhookUrl = `${webhookBaseUrl}/api/webhooks/media-server/progress`;
+	const webhookUrl = getMediaServerWebhookUrl();
 	const webhookSecret = serverEnv().MEDIA_SERVER_WEBHOOK_SECRET;
 
 	await startMediaServerProcessJob(mediaServerUrl, {
