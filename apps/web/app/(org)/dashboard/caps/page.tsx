@@ -12,6 +12,7 @@ import {
 	videoUploads,
 } from "@cap/database/schema";
 import { serverEnv } from "@cap/env";
+import { isSharedWorkspaceOrg } from "@cap/utils";
 import { Database, ImageUploads } from "@cap/web-backend";
 import { type ImageUpload, Video } from "@cap/web-domain";
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -120,10 +121,10 @@ export default async function CapsPage(props: PageProps<"/dashboard/caps">) {
 	const userId = user.id;
 	const offset = (page - 1) * limit;
 
-	const sharedWorkspaceOrgId = serverEnv().DEFAULT_ORG_ID;
-	const isSharedWorkspace =
-		!!sharedWorkspaceOrgId &&
-		user.activeOrganizationId === sharedWorkspaceOrgId;
+	const isSharedWorkspace = isSharedWorkspaceOrg(
+		user.activeOrganizationId,
+		serverEnv().DEFAULT_ORG_ID,
+	);
 	const ownerScope = isSharedWorkspace ? undefined : eq(videos.ownerId, userId);
 
 	const totalCountResult = await db()
@@ -134,6 +135,7 @@ export default async function CapsPage(props: PageProps<"/dashboard/caps">) {
 			and(
 				ownerScope,
 				eq(organizations.id, user.activeOrganizationId),
+				isNull(videos.folderId),
 				isNull(organizations.tombstoneAt),
 			),
 		);

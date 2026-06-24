@@ -1,4 +1,5 @@
-import { isEmailAllowedByRestriction } from "@cap/utils";
+import { serverEnv } from "@cap/env";
+import { isEmailAllowedByRestriction, isSharedWorkspaceOrg } from "@cap/utils";
 import { Policy, Video } from "@cap/web-domain";
 import { Array, Effect, Option } from "effect";
 
@@ -21,6 +22,10 @@ export type VideosPolicyDeps = {
 			userId: any,
 			videoId: Video.VideoId,
 		) => Effect.Effect<readonly { membershipId: string }[], any>;
+		membership: (
+			userId: any,
+			orgId: any,
+		) => Effect.Effect<Option.Option<{ membershipId: string }>, any>;
 		allowedEmailDomain: (
 			orgId: any,
 		) => Effect.Effect<Option.Option<string>, any>;
@@ -31,10 +36,11 @@ export type VideosPolicyDeps = {
 			videoId: Video.VideoId,
 		) => Effect.Effect<Option.Option<{ membershipId: string }>, any>;
 	};
+	sharedWorkspaceOrgId: string | null | undefined;
 };
 
 export function buildCanView(
-	{ repo, orgsRepo, spacesRepo }: VideosPolicyDeps,
+	{ repo, orgsRepo, spacesRepo, sharedWorkspaceOrgId }: VideosPolicyDeps,
 	videoId: Video.VideoId,
 ) {
 	return Policy.publicPolicy(
@@ -52,20 +58,32 @@ export function buildCanView(
 				const userId = user.value.id;
 				if (userId === video.ownerId) return true;
 
-				const [videoOrgShareMembership, videoSpaceShareMembership] =
-					yield* Effect.all([
-						orgsRepo
-							.membershipForVideo(userId, video.id)
-							.pipe(Effect.map(Array.get(0))),
-						spacesRepo.membershipForVideo(userId, video.id),
-					]);
+				const sharedWorkspace = isSharedWorkspaceOrg(
+					video.orgId,
+					sharedWorkspaceOrgId,
+				);
+
+				const [
+					videoOrgShareMembership,
+					videoSpaceShareMembership,
+					sharedWorkspaceMembership,
+				] = yield* Effect.all([
+					orgsRepo
+						.membershipForVideo(userId, video.id)
+						.pipe(Effect.map(Array.get(0))),
+					spacesRepo.membershipForVideo(userId, video.id),
+					sharedWorkspace
+						? orgsRepo.membership(userId, video.orgId)
+						: Effect.succeed(Option.none<{ membershipId: string }>()),
+				]);
 
 				if (
 					Option.isSome(videoOrgShareMembership) ||
-					Option.isSome(videoSpaceShareMembership)
+					Option.isSome(videoSpaceShareMembership) ||
+					Option.isSome(sharedWorkspaceMembership)
 				) {
 					yield* Effect.log(
-						"Explicit org/space membership found. Access granted.",
+						"Explicit org/space/workspace membership found. Access granted.",
 					);
 					yield* Video.verifyPassword(video, password);
 					return true;
@@ -123,7 +141,12 @@ export class VideosPolicy extends Effect.Service<VideosPolicy>()(
 			const orgsRepo = yield* OrganisationsRepo;
 			const spacesRepo = yield* SpacesRepo;
 
-			const deps: VideosPolicyDeps = { repo, orgsRepo, spacesRepo };
+			const deps: VideosPolicyDeps = {
+				repo,
+				orgsRepo,
+				spacesRepo,
+				sharedWorkspaceOrgId: serverEnv().DEFAULT_ORG_ID,
+			};
 
 			const canView = (videoId: Video.VideoId) => buildCanView(deps, videoId);
 

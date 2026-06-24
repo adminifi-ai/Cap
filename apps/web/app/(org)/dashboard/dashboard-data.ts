@@ -10,6 +10,8 @@ import {
 	users,
 	videos,
 } from "@cap/database/schema";
+import { serverEnv } from "@cap/env";
+import { isSharedWorkspaceOrg } from "@cap/utils";
 import { Database, ImageUploads } from "@cap/web-backend";
 import type { ImageUpload } from "@cap/web-domain";
 import { and, count, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -184,12 +186,27 @@ export async function getDashboardData(user: typeof userSelectProps) {
 					.where(eq(organizationMembers.organizationId, activeOrgInfo.id));
 				const orgMemberCount = orgMemberCountResult[0]?.value || 0;
 
-				const orgVideoCountResult = await db()
-					.select({
-						value: sql<number>`COUNT(DISTINCT ${sharedVideos.videoId})`,
-					})
-					.from(sharedVideos)
-					.where(eq(sharedVideos.organizationId, activeOrgInfo.id));
+				const orgVideoCountResult = isSharedWorkspaceOrg(
+					activeOrgInfo.id,
+					serverEnv().DEFAULT_ORG_ID,
+				)
+					? await db()
+							.select({
+								value: sql<number>`COUNT(DISTINCT ${videos.id})`,
+							})
+							.from(videos)
+							.where(
+								and(
+									eq(videos.orgId, activeOrgInfo.id),
+									isNull(videos.folderId),
+								),
+							)
+					: await db()
+							.select({
+								value: sql<number>`COUNT(DISTINCT ${sharedVideos.videoId})`,
+							})
+							.from(sharedVideos)
+							.where(eq(sharedVideos.organizationId, activeOrgInfo.id));
 				const orgVideoCount = orgVideoCountResult[0]?.value || 0;
 
 				const userCapsCountResult = await db()

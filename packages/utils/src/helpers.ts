@@ -101,3 +101,12 @@ export function isEmailAllowedByRestriction(
 		return lowerEmail.endsWith(`@${entry}`);
 	});
 }
+
+export function isSharedWorkspaceOrg(
+	orgId: string | null | undefined,
+	defaultOrgId: string | null | undefined,
+): boolean {
+	const org = orgId?.trim();
+	const shared = defaultOrgId?.trim();
+	return !!org && !!shared && org === shared;
+}

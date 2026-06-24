@@ -13,6 +13,7 @@ import {
 	videoUploads,
 } from "@cap/database/schema";
 import { serverEnv } from "@cap/env";
+import { isSharedWorkspaceOrg } from "@cap/utils";
 import {
 	Database,
 	ImageUploads,
@@ -278,56 +279,82 @@ export default async function SharedCapsPage(props: {
 			limit: number,
 		) {
 			const offset = (page - 1) * limit;
+			const sharedWorkspace = isSharedWorkspaceOrg(
+				orgId,
+				serverEnv().DEFAULT_ORG_ID,
+			);
+
+			const videoListSelect = {
+				id: videos.id,
+				ownerId: videos.ownerId,
+				name: videos.name,
+				createdAt: videos.createdAt,
+				metadata: videos.metadata,
+				duration: videos.duration,
+				totalComments: sql<number>`COUNT(DISTINCT CASE WHEN ${comments.type} = 'text' THEN ${comments.id} END)`,
+				totalReactions: sql<number>`COUNT(DISTINCT CASE WHEN ${comments.type} = 'emoji' THEN ${comments.id} END)`,
+				ownerName: users.name,
+				effectiveDate: videos.effectiveCreatedAt,
+				hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
+					Boolean,
+				),
+			};
+
+			const videoGroupBy = [
+				videos.id,
+				videos.ownerId,
+				videos.name,
+				videos.createdAt,
+				videos.metadata,
+				users.name,
+				videos.duration,
+			] as const;
+
 			const [videoRows, totalCountResult] = await Promise.all([
-				db()
-					.select({
-						id: videos.id,
-						ownerId: videos.ownerId,
-						name: videos.name,
-						createdAt: videos.createdAt,
-						metadata: videos.metadata,
-						duration: videos.duration,
-						totalComments: sql<number>`COUNT(DISTINCT CASE WHEN ${comments.type} = 'text' THEN ${comments.id} END)`,
-						totalReactions: sql<number>`COUNT(DISTINCT CASE WHEN ${comments.type} = 'emoji' THEN ${comments.id} END)`,
-						ownerName: users.name,
-						effectiveDate: videos.effectiveCreatedAt,
-						hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
-							Boolean,
-						),
-					})
-					.from(sharedVideos)
-					.innerJoin(videos, eq(sharedVideos.videoId, videos.id))
-					.leftJoin(comments, eq(videos.id, comments.videoId))
-					.leftJoin(users, eq(videos.ownerId, users.id))
-					.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
-					.where(
-						and(
-							eq(sharedVideos.organizationId, orgId),
-							isNull(sharedVideos.folderId),
-						),
-					)
-					.groupBy(
-						videos.id,
-						videos.ownerId,
-						videos.name,
-						videos.createdAt,
-						videos.metadata,
-						users.name,
-						videos.duration,
-					)
-					.orderBy(desc(videos.effectiveCreatedAt))
-					.limit(limit)
-					.offset(offset),
-				db()
-					.select({ count: count() })
-					.from(sharedVideos)
-					.innerJoin(videos, eq(sharedVideos.videoId, videos.id))
-					.where(
-						and(
-							eq(sharedVideos.organizationId, orgId),
-							isNull(videos.folderId),
-						),
-					),
+				sharedWorkspace
+					? db()
+							.select(videoListSelect)
+							.from(videos)
+							.leftJoin(comments, eq(videos.id, comments.videoId))
+							.leftJoin(users, eq(videos.ownerId, users.id))
+							.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
+							.where(and(eq(videos.orgId, orgId), isNull(videos.folderId)))
+							.groupBy(...videoGroupBy)
+							.orderBy(desc(videos.effectiveCreatedAt))
+							.limit(limit)
+							.offset(offset)
+					: db()
+							.select(videoListSelect)
+							.from(sharedVideos)
+							.innerJoin(videos, eq(sharedVideos.videoId, videos.id))
+							.leftJoin(comments, eq(videos.id, comments.videoId))
+							.leftJoin(users, eq(videos.ownerId, users.id))
+							.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
+							.where(
+								and(
+									eq(sharedVideos.organizationId, orgId),
+									isNull(sharedVideos.folderId),
+								),
+							)
+							.groupBy(...videoGroupBy)
+							.orderBy(desc(videos.effectiveCreatedAt))
+							.limit(limit)
+							.offset(offset),
+				sharedWorkspace
+					? db()
+							.select({ count: count() })
+							.from(videos)
+							.where(and(eq(videos.orgId, orgId), isNull(videos.folderId)))
+					: db()
+							.select({ count: count() })
+							.from(sharedVideos)
+							.innerJoin(videos, eq(sharedVideos.videoId, videos.id))
+							.where(
+								and(
+									eq(sharedVideos.organizationId, orgId),
+									isNull(videos.folderId),
+								),
+							),
 			]);
 			return {
 				videos: videoRows,

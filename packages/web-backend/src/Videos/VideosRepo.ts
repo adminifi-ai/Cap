@@ -1,6 +1,5 @@
 import { nanoId } from "@cap/database/helpers";
 import * as Db from "@cap/database/schema";
-import { serverEnv } from "@cap/env";
 import { Video } from "@cap/web-domain";
 import * as Dz from "drizzle-orm";
 import type { MySqlInsertBase } from "drizzle-orm/mysql-core";
@@ -94,19 +93,6 @@ export class VideosRepo extends Effect.Service<VideosRepo>()("VideosRepo", {
 										orgId: data.orgId,
 										source: data.importSource.source,
 										sourceId: data.importSource.id,
-									},
-								]),
-							);
-
-						const sharedWorkspaceOrgId = serverEnv().DEFAULT_ORG_ID;
-						if (sharedWorkspaceOrgId && data.orgId === sharedWorkspaceOrgId)
-							promises.push(
-								db.insert(Db.sharedVideos).values([
-									{
-										id: nanoId(),
-										videoId: id,
-										organizationId: data.orgId,
-										sharedByUserId: data.ownerId,
 									},
 								]),
 							);
