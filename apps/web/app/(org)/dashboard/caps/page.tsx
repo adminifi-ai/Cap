@@ -120,13 +120,19 @@ export default async function CapsPage(props: PageProps<"/dashboard/caps">) {
 	const userId = user.id;
 	const offset = (page - 1) * limit;
 
+	const sharedWorkspaceOrgId = serverEnv().DEFAULT_ORG_ID;
+	const isSharedWorkspace =
+		!!sharedWorkspaceOrgId &&
+		user.activeOrganizationId === sharedWorkspaceOrgId;
+	const ownerScope = isSharedWorkspace ? undefined : eq(videos.ownerId, userId);
+
 	const totalCountResult = await db()
 		.select({ count: count() })
 		.from(videos)
 		.leftJoin(organizations, eq(videos.orgId, organizations.id))
 		.where(
 			and(
-				eq(videos.ownerId, userId),
+				ownerScope,
 				eq(organizations.id, user.activeOrganizationId),
 				isNull(organizations.tombstoneAt),
 			),
@@ -178,7 +184,7 @@ export default async function CapsPage(props: PageProps<"/dashboard/caps">) {
 		.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
 		.where(
 			and(
-				eq(videos.ownerId, userId),
+				ownerScope,
 				eq(videos.orgId, user.activeOrganizationId),
 				isNull(videos.folderId),
 				isNull(organizations.tombstoneAt),
