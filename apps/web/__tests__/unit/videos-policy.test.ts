@@ -44,14 +44,18 @@ function makeDeps(config: {
 	password?: Option.Option<string>;
 	orgMembership?: boolean;
 	spaceMembership?: boolean;
+	workspaceMembership?: boolean;
 	allowedEmailDomain?: Option.Option<string>;
+	sharedWorkspaceOrgId?: string | null;
 }): VideosPolicyDeps {
 	const {
 		video,
 		password = Option.none<string>(),
 		orgMembership = false,
 		spaceMembership = false,
+		workspaceMembership = false,
 		allowedEmailDomain = Option.none<string>(),
+		sharedWorkspaceOrgId = null,
 	} = config;
 
 	return {
@@ -64,6 +68,12 @@ function makeDeps(config: {
 		orgsRepo: {
 			membershipForVideo: () =>
 				Effect.succeed(orgMembership ? [{ membershipId: "mem-1" }] : []),
+			membership: () =>
+				Effect.succeed(
+					workspaceMembership
+						? Option.some({ membershipId: "wmem-1" })
+						: Option.none(),
+				),
 			allowedEmailDomain: () => Effect.succeed(allowedEmailDomain),
 		},
 		spacesRepo: {
@@ -74,6 +84,7 @@ function makeDeps(config: {
 						: Option.none(),
 				),
 		},
+		sharedWorkspaceOrgId,
 	};
 }
 
@@ -203,6 +214,57 @@ describe("VideosPolicy.canView", () => {
 			});
 
 			expect(await runCanView(deps, makeUser("bob@gmail.com"))).toBe("allowed");
+		});
+	});
+
+	describe("shared workspace org", () => {
+		it("allows a member of the shared-workspace org on a private video", async () => {
+			const deps = makeDeps({
+				video: makeVideo({ public: false, orgId: TEST_ORG_ID }),
+				workspaceMembership: true,
+				sharedWorkspaceOrgId: TEST_ORG_ID,
+			});
+
+			expect(await runCanView(deps, makeUser("member@company.com"))).toBe(
+				"allowed",
+			);
+		});
+
+		it("allows a workspace member despite an email restriction", async () => {
+			const deps = makeDeps({
+				video: makeVideo({ public: false, orgId: TEST_ORG_ID }),
+				workspaceMembership: true,
+				sharedWorkspaceOrgId: TEST_ORG_ID,
+				allowedEmailDomain: Option.some("restricted.com"),
+			});
+
+			expect(await runCanView(deps, makeUser("contractor@gmail.com"))).toBe(
+				"allowed",
+			);
+		});
+
+		it("denies a non-member even in the shared-workspace org", async () => {
+			const deps = makeDeps({
+				video: makeVideo({ public: false, orgId: TEST_ORG_ID }),
+				workspaceMembership: false,
+				sharedWorkspaceOrgId: TEST_ORG_ID,
+			});
+
+			expect(await runCanView(deps, makeUser("outsider@other.com"))).toBe(
+				"denied",
+			);
+		});
+
+		it("does not grant workspace access when the video's org is not the shared workspace", async () => {
+			const deps = makeDeps({
+				video: makeVideo({ public: false, orgId: TEST_ORG_ID }),
+				workspaceMembership: true,
+				sharedWorkspaceOrgId: "a-different-org",
+			});
+
+			expect(await runCanView(deps, makeUser("member@company.com"))).toBe(
+				"denied",
+			);
 		});
 	});
 
