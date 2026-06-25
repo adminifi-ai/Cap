@@ -88,6 +88,13 @@ export function isMediaServerConfigured(): boolean {
 	return !!env.MEDIA_SERVER_URL && !!env.MEDIA_SERVER_WEBHOOK_SECRET;
 }
 
+const MEDIA_SERVER_WEBHOOK_PATH = "/api/webhooks/media-server/progress";
+
+export function getMediaServerWebhookUrl(): string {
+	const env = serverEnv();
+	return `${env.MEDIA_SERVER_WEBHOOK_URL || env.WEB_URL}${MEDIA_SERVER_WEBHOOK_PATH}`;
+}
+
 export async function checkMediaServerHealth(): Promise<{
 	status: string;
 	ffmpeg: { available: boolean; version: string };

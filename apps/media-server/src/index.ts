@@ -32,5 +32,6 @@ process.on("SIGHUP", () => {
 
 export default {
 	port,
+	hostname: "::",
 	fetch: app.fetch,
 };

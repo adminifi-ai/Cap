@@ -529,7 +529,10 @@ app.post(
 								cause instanceof Error ? cause : new Error(String(cause)),
 						}).pipe(
 							Effect.catchAll((error) => {
-								console.error("Failed to queue faststart remux:", error);
+								console.error(
+									"Faststart remux enqueue failed (video remains playable):",
+									error,
+								);
 								return Effect.succeed(null);
 							}),
 						);
