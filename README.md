@@ -10,7 +10,7 @@
     <br />
     <br />
     <b>Internal Downloads: </b>
-		<a href="https://github.com/adminifi-ai/Cap/actions/workflows/self-build.yml">macOS & Windows builds</a>
+		<a href="https://github.com/r90group/Cap/actions/workflows/self-build.yml">macOS & Windows builds</a>
     <br />
   </p>
 </p>
@@ -24,7 +24,7 @@ Cap is the open source alternative to Loom. It's a video messaging tool that all
 
 # Our Deployment
 
-This fork runs against an internal self-hosted Cap instance deployed on **[Railway](https://railway.com/)**. Desktop builds produced by the workflow below are pre-configured to talk to that instance.
+This R90 fork runs against an internal self-hosted Cap instance deployed on **[Railway](https://railway.com/)**. Desktop builds produced by the workflow below are pre-configured to talk to that instance.
 
 For access to the Railway project, environment variables, deployment issues, or anything else about our internal instance, ping **[@jacogrande](https://github.com/jacogrande)**.
 
@@ -32,7 +32,7 @@ For access to the Railway project, environment variables, deployment issues, or 
 
 We don't publish signed releases — instead, we build unsigned desktop installers on demand via GitHub Actions and download them as run artifacts.
 
-1. Go to **[Actions → self-build](https://github.com/adminifi-ai/Cap/actions/workflows/self-build.yml)** in this repo.
+1. Go to **[Actions → self-build](https://github.com/r90group/Cap/actions/workflows/self-build.yml)** in this repo.
 2. Pick the most recent successful run (or trigger a new one — see below).
 3. Scroll to the **Artifacts** section at the bottom of the run page and download the build for your platform:
    - `cap-aarch64-apple-darwin` — Apple Silicon Macs (M1/M2/M3/M4)
